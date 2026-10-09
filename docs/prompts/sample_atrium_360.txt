@@ -1,0 +1,16 @@
+Generate ONE seamless 360-degree EQUIRECTANGULAR panorama image (exact 2:1 aspect ratio, full 360 x 180 degrees), for use as a spherical environment texture viewed from the inside of a sphere.
+
+PROJECTION RULES (most important):
+- true equirectangular projection: the horizon is a perfectly straight horizontal line at exactly half height
+- the LEFT edge and the RIGHT edge must connect seamlessly (the same content continues across the seam)
+- the top row is the zenith (ceiling directly above), the bottom row is the nadir (floor directly below), stretched horizontally as in a real equirectangular photo
+- vertical lines (pillars, window frames) stay vertical; no fisheye circle, no border, no frame, no vignette
+
+SCENE: the inside of a bright, round, sunlit greenhouse cafe-atrium with white-painted steel window frames, seen from the center of the room at standing eye height (about 1.6 m), daytime.
+- one direction (the CENTER of the image): a flat, front-facing large blank wall screen in a thin white frame, the screen surface a FLAT UNIFORM dark charcoal gray, mounted on a low white brick wall
+- around the room: tall glass windows with a blue sky and soft clouds, lots of green potted plants and small lemon trees, a few round wooden cafe tables with chairs placed near the walls (not near the center), warm hanging lamps
+- above: a glass ceiling with a simple white steel grid and blue sky
+- below: a light terracotta tile floor, simple and evenly lit, with a wide EMPTY open area in the middle of the room
+- palette: white, terracotta, leaf green, sky blue, warm sunlight. Painterly anime background art style, clean, highly detailed
+
+NO people, NO characters, NO animals, NO text, NO letters, NO logo, NO watermark.

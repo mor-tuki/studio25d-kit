@@ -1,0 +1,9 @@
+{
+  "character": {
+    "vrm": null,
+    "armsDownZ": 1.15,
+    "lookAtCamera": true,
+    "tuneSprings": true,
+    "materialRules": []
+  }
+}

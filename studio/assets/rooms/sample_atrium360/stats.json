@@ -1,0 +1,35 @@
+{
+ "src": "pano.png",
+ "size": [
+  1774,
+  887
+ ],
+ "aspect": 2.0,
+ "seamRatio": 2.515,
+ "seamDiff": 24.72,
+ "interiorDiff": 9.83,
+ "poleSpread": {
+  "zenith": 30.95,
+  "nadir": 6.94
+ },
+ "floorRow": 515,
+ "floorDepressionDeg": 14.51,
+ "suggest": {
+  "pano.height": 1.6,
+  "pano.radius": 6.18,
+  "note": "radius ≈ height / tan(床と壁の境目の俯角)。部屋が狭く見えたら大きく、床が流れて見えたら小さく"
+ },
+ "seamRatioAfter": 0.0,
+ "output": {
+  "pano": [
+   4096,
+   2048
+  ],
+  "light": {
+   "sky": "#8D9D90",
+   "ground": "#C3926D",
+   "hot": "#F8FAF2",
+   "meanLum": 0.6015957191418579
+  }
+ }
+}

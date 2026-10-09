@@ -1,0 +1,14 @@
+# 検査・撮影・ログの出力
+output/
+__pycache__/
+*.pyc
+# 操作パネルから読み込んだスライド画像と、その並び
+studio/assets/uploads/
+# 自分のキャラクター（他人のモデルを誤って公開しない。公開してよいものだけ git add -f で）
+*.vrm
+# 公開したくない作業中のデッキはこの名前で置く
+studio/assets/slides/private_*/
+# 任意の拡大モデル
+tools/models/
+.DS_Store
+Thumbs.db

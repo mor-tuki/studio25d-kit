@@ -1,0 +1,13 @@
+Generate ONE background plate for a 2.5D virtual streaming stage (a single illustration that will later be turned into a depth map and viewed with a slightly moving camera for parallax).
+
+SCENE: a cozy, sunlit wooden radio-and-craft studio in the afternoon. Light oak floor boards, white plaster walls, a big multi-pane window on the RIGHT wall with soft daylight and green trees outside, a few potted green plants (monstera, fern), warm pendant lamps, wooden shelves with plain unlabeled books and ceramic jars, a small wooden side table.
+
+COMPOSITION (most important):
+- Wide 16:9 landscape. Camera straight-on, eye height about 1.5 m, horizon around 45% from the top, symmetric one-point perspective.
+- A flat, front-facing, PERFECT RECTANGLE screen hangs on the back wall, centered-left (its center about 38% from the left edge), occupying about 36% of the image width, with a thin light wood frame. The screen surface is a FLAT, UNIFORM dark charcoal gray (it will be replaced by slides). Its edges must be straight and crisp, not a trapezoid.
+- An EMPTY standing spot on the floor to the RIGHT of the screen (about 72-78% from the left, lower third of the image), clear of objects, softly lit. Nothing stands there.
+- Clear depth layering: FOREGROUND (a plant pot at the bottom-left corner and the edge of a wooden stool at the bottom-right corner, small, not covering the middle), MIDGROUND (the floor, the side table, the standing spot), BACKGROUND (back wall with the screen, shelves, window).
+- Keep a calm margin at all four image edges: no object should be cut in half by the frame in a way that dominates the edge; the outer 6% of the image should be simple wall, floor or soft foliage.
+- Painterly anime background art style, clean shapes, soft shading, warm and bright palette (oak brown, cream white, sage green, soft orange lamp light).
+
+ABSOLUTELY NO people, NO characters, NO silhouettes, NO animals, NO text, NO letters, NO numbers, NO logos, NO watermark.

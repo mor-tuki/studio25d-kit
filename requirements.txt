@@ -1,0 +1,10 @@
+# サーバー（studio/server.py）は Python 3.10+ の標準ライブラリだけで動きます。以下は tools/ の道具用。
+numpy
+Pillow
+# 深度（tools/make_depth.py）
+torch
+transformers>=4.45
+# 検査・スクリーンショット（tools/studio_check.py）。追加で: python -m playwright install chromium
+playwright
+# PDF → スライド（tools/pdf_to_slides.py）
+pymupdf
