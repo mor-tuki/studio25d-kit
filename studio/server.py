@@ -543,20 +543,26 @@ class StudioHandler(BaseHTTPRequestHandler):
             raise APIError("Body too large.", 413, "body_size")
         return self.rfile.read(length)
 
+    @staticmethod
+    def safe_name(value, default):
+        """Flatten a client-supplied name to one path component ('..' / '.' / '' fall back to default)."""
+        name = os.path.basename(value.replace("\\", "/"))
+        return default if name in ("", ".", "..") else name
+
     def capture(self, path, query):
         """Capture sinks for shots / safety frames / page logs."""
         base = self.server.capture_dir / "shots"
         body = self.read_raw()
         base.mkdir(parents=True, exist_ok=True)
         if path == "/save":
-            name = os.path.basename(query.get("name", ["shot.png"])[0]) or "shot.png"
+            name = self.safe_name(query.get("name", ["shot.png"])[0], "shot.png")
             if not name.lower().endswith((".png", ".jpg", ".json")):
                 name += ".png"
             (base / name).write_bytes(body)
             return {"ok": True, "name": name, "bytes": len(body)}
         if path == "/save_frame":
-            folder = os.path.basename(query.get("dir", ["frames"])[0]) or "frames"
-            seq = os.path.basename(query.get("seq", ["0000"])[0]) or "0000"
+            folder = self.safe_name(query.get("dir", ["frames"])[0], "frames")
+            seq = self.safe_name(query.get("seq", ["0000"])[0], "0000")
             ext = query.get("ext", ["png"])[0]
             ext = ext if ext in ("png", "jpg", "json") else "png"
             target = base / folder
@@ -574,7 +580,8 @@ class StudioHandler(BaseHTTPRequestHandler):
         kind = payload.get("kind") if isinstance(payload, dict) and payload.get("kind") in ("coverage", "safety", "motion", "slip") else "coverage"
         target = reports / f"{kind}-{time.strftime('%Y%m%d-%H%M%S')}.json"
         target.write_text(json.dumps(payload, ensure_ascii=False, indent=1), encoding="utf-8")
-        return {"ok": True, "path": str(target)}
+        # relative to the kit root (default capture dir = <kit>/output) so no absolute local path leaks into reports/logs
+        return {"ok": True, "path": target.relative_to(self.server.capture_dir.parent).as_posix()}
 
     def do_HEAD(self):
         self.do_GET()

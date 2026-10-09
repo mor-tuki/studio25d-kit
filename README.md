@@ -24,7 +24,7 @@
 ### Windows
 
 ```powershell
-git clone <this repo> studio25d-kit
+git clone https://github.com/mor-tuki/studio25d-kit studio25d-kit
 cd studio25d-kit
 powershell -ExecutionPolicy Bypass -File start-studio.ps1      # サーバーを裏で起動して操作パネルを開く
 # 止める: Stop-Process -Id (Get-Content output\server.pid)
@@ -33,10 +33,12 @@ powershell -ExecutionPolicy Bypass -File start-studio.ps1      # サーバーを
 ### macOS / Linux
 
 ```sh
-git clone <this repo> studio25d-kit
+git clone https://github.com/mor-tuki/studio25d-kit studio25d-kit
 cd studio25d-kit
 ./start-studio.sh                 # 止める: kill "$(cat output/server.pid)"
 ```
+
+`./start-studio.sh` が `Permission denied` になるとき（zip で落とした等で実行権限が無い）は `sh start-studio.sh` で同じように動きます。
 
 前に出したまま使いたいなら `python studio/server.py --port 8811`（Ctrl+C で停止）。
 
@@ -90,14 +92,17 @@ CLI からも操作できます：`python tools/studio_ctl.py room next`・`slid
 手順・プロンプトの型・合格条件は **[AGENTS.md](AGENTS.md)** に AI エージェント向けの手順書としてまとめてあります（人が読んでもそのまま使えます）。ざっくり：
 
 ```sh
-pip install -r requirements.txt && python -m playwright install chromium
+pip install -r requirements.txt && python -m playwright install chromium   # Linux で GPU 不要なら先に: pip install torch --index-url https://download.pytorch.org/whl/cpu
 python tools/make_depth.py my_room.png studio/assets/rooms/my_room          # 2.5D：深度（Depth Anything V2）
 python tools/pano_prep.py my_pano.png studio/assets/rooms/my_pano            # 360°：検査＋整え＋4K 化
 # rooms.json に 1 件足す（AGENTS.md の雛形をコピー）
-python tools/studio_check.py coverage --serve                                 # 絵の外が 1 px も映らないことを数で確認
+python tools/studio_check.py coverage --serve --port 8812                     # 絵の外が 1 px も映らないことを数で確認
 python tools/studio_parallax.py                                               # 立体感（視差）を数で確認
 python tools/studio_check.py smoke                                            # 起動〜描画〜動画再生のスモークテスト
 ```
+
+- 検査は `--serve` で検査専用のサーバーを立てます。**配信中は `--port 8812` など 8811 以外を指定**してください（8811 で動いている本番のスタジオを検査が操作してしまうため）。
+- PDF の変換（`tools/pdf_to_slides.py`）だけは `pip install pymupdf` が別に要ります（AGPL-3.0 のため requirements.txt には入れていない任意の依存）。
 
 困ったら **[docs/troubleshooting.md](docs/troubleshooting.md)**（黒い帯が出る・サーバーが勝手に止まる・VRM が後ろを向く…）。
 
@@ -116,10 +121,10 @@ docs/              トラブルシューティング・画像・見本のプロ�
 
 ```sh
 python -B -m unittest discover -s studio/tests -v     # サーバー（標準ライブラリだけ・24 件）
-python tools/studio_check.py smoke                    # ブラウザで実際に描画して docs/images/ に撮る
+python tools/studio_check.py smoke                    # ブラウザで実際に描画して output/shots/ に撮る（--docs で docs/images/ を更新）
 ```
 
 ## ライセンス
 
-コード：MIT（[LICENSE](LICENSE)）。同梱の three.js と three-vrm も MIT（[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)）。
+コード：MIT（[LICENSE](LICENSE)）。同梱の three.js（r166）と three-vrm（v3.4.4）も MIT（[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)）。
 見本の絵は、このキットのために画像生成 AI で新しく作ったもので、同じ MIT で配布します。

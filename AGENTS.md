@@ -13,14 +13,17 @@
 
 ```sh
 python --version                          # 3.10+
-pip install -r requirements.txt           # numpy Pillow torch transformers playwright pymupdf
-python -m playwright install chromium     # Google Chrome が入っていれば不要（H.264 動画は Chrome の方が確実）
+pip install torch --index-url https://download.pytorch.org/whl/cpu   # Linux：GPU 不要なら先に CPU 版を（CUDA 版は数 GB）
+pip install -r requirements.txt           # numpy Pillow torch transformers playwright
+python -m playwright install chromium     # Google Chrome が入っていれば不要（Linux の同梱 Chromium は H.264 を再生できず、smoke の動画検査が skip になる）
 python -B -m unittest discover -s studio/tests     # 24 tests OK
 python tools/studio_check.py smoke                 # RESULT: PASS
 ```
 
+- PDF からスライドを作る道具（`tools/pdf_to_slides.py`）を使うときだけ `pip install pymupdf`（AGPL-3.0・任意。requirements には入れていない）。
 - 画像生成は持ち主が使える道具で行う（Codex CLI の `image_gen`、ChatGPT、Gemini、Stable Diffusion 等）。このキットの見本は Codex CLI で作った：
   `codex exec -s workspace-write --skip-git-repo-check "Read prompt.txt. Use the image_gen tool to generate ONE image following it, in the widest 16:9 landscape size available. Save the PNG to room.png." < /dev/null`
+  （Windows では `< /dev/null` の代わりに `< NUL`。cmd ならそのまま、PowerShell は `<` を使えないので `cmd /c "codex exec ... < NUL"` で包む）
   （プロンプトはファイルに置いて読ませる。実際に使ったプロンプト＝ `docs/prompts/`）
 - 部屋の `id` は英小文字・数字・`_` だけ（例 `my_library`）。素材は `studio/assets/rooms/<id>/` に置く。
 
@@ -67,18 +70,28 @@ ABSOLUTELY NO people, NO characters, NO silhouettes, NO animals, NO text, NO let
 ### 生成後のチェック（目で見る＋数える）
 
 1. 画像を開いて見る：人・文字・ロゴが無い／スクリーンが長方形／立ち位置が空いている。どれか欠けたら作り直す（直すより作り直しが速い）。
-2. スクリーンの 4 隅を数で取る（暗い一様面の検出）：
+2. スクリーンの 4 隅を数で取る（暗い一様面の検出）。`ROWS`＝暗い行を探す横の範囲、`COLS`＝暗い列を探す横の範囲（絵の幅に対する割合）。
+   **2.5D は `ROWS=(.25,.5)` / `COLS=(.1,.7)`、360° は `ROWS=(.4,.6)` / `COLS=(.3,.7)`**（スクリーンが絵の横中央にあるため）。
+   `SIZE` には rooms.json の `width, height`（座標系）を入れる。画像がそれと違う大きさなら縮めてから測る：
 
 ```python
 import numpy as np; from PIL import Image
-a = np.asarray(Image.open("studio/assets/rooms/<id>/bg.jpg").convert("L")).astype(int); m = a < 80
-H, W = a.shape
-rows = [y for y in range(H) if m[y, int(W*.25):int(W*.5)].mean() > .9]
-cols = [x for x in range(int(W*.1), int(W*.7)) if m[min(rows):max(rows), x].mean() > .9]
-print("screen x", min(cols), max(cols), "y", min(rows), max(rows))
+PATH, SIZE = "studio/assets/rooms/<id>/bg.jpg", (1672, 941)   # 360° なら pano_4k.jpg と (width, height)
+ROWS, COLS = (.25, .5), (.1, .7)                               # 360° なら (.4, .6), (.3, .7)
+im = Image.open(PATH).convert("L")
+if im.size != SIZE: im = im.resize(SIZE, Image.LANCZOS)
+a = np.asarray(im).astype(int); m = a < 80; H, W = a.shape
+rows = [y for y in range(H) if m[y, int(W*ROWS[0]):int(W*ROWS[1])].mean() > .9]
+cols = [x for x in range(int(W*COLS[0]), int(W*COLS[1])) if rows and m[min(rows):max(rows), x].mean() > .9]
+if not rows or not cols:
+    raise SystemExit("暗い一様面が見つからない：ROWS/COLS を絵のスクリーン位置に合わせるか、しきい値 80 を上げる（スクリーンが明るすぎるなら作り直し）")
+y0, y1, x0, x1 = min(rows), max(rows), min(cols), max(cols); w = (y1 - y0) * 16 / 9; cx = (x0 + x1) / 2
+print("dark  x", x0, x1, "y", y0, y1)
+print("16:9  x", round(cx - w / 2), round(cx + w / 2), "y", y0, y1)   # これを screen の 4 隅にする
 ```
 
-   暗い面が 16:9 でなければ、高さに合わせて **左右を内側に詰めた 16:9 の矩形** を `screen` にする（残りの暗い帯は枠の一部に見える）。
+   見本での結果：2.5D アトリエ＝暗い面 x 349〜939・y 147〜442 → 16:9 で **x 382〜906**（rooms.json と一致）。360° 温室＝ 16:9 で x 741〜1032・y 288〜452（rooms.json の 739〜1034 / 286〜452 と ±2 px。rooms.json は元画像で測った値）。
+   暗い面が 16:9 でなければ、高さに合わせて **左右を内側に詰めた 16:9 の矩形** を `screen` にする（残りの暗い帯は枠の一部に見える。上の `16:9` 行がそれ）。
 3. 保存：`bg.jpg`（JPEG 品質 90・長辺 1600〜2048 px で十分）と `thumb.jpg`（640×360）。
 
 ```sh
@@ -130,6 +143,15 @@ python tools/pano_prep.py pano.png studio/assets/rooms/<id>
 | `suggest.pano.radius` | rooms.json の `pano.radius` の初期値に使う |
 
 出力：`pano_4k.jpg`（4096×2048・継ぎ目を寄せ、極を均し、左右を巻き込んで拡大）、`thumb.jpg`、`light.json`（照明色の目安）、`stats.json`。
+
+`light.json` → rooms.json の `lighting` への写し方（キャラ用の光。背景には効かない）：
+
+| light.json | rooms.json | 写し方 |
+|---|---|---|
+| `ground`（下半分の平均色） | `lighting.hemi.ground` | そのまま |
+| `hot`（最も明るい 1.5% の画素の平均色） | `lighting.rim.color` | そのまま（窓・照明の色が輪郭光になる） |
+| `sky`（上半分の平均色） | `lighting.hemi.sky` | **目で調整**。上半分は壁や葉も含むので暗く濁りやすい。少し明るく・空や天井の色味へ寄せる（見本：`#8D9D90` → `#C9D8E6`） |
+| `meanLum` | — | 参考値（`exposure` の目安。0.6 前後なら既定 1.0 のまま） |
 8K で細部が欲しいときだけ `tools/pano_upscale.py`（Real-ESRGAN・任意）。
 
 スクリーン矩形は 2.5D と同じ要領で、パノラマの元画像の座標で取る（16:9 に詰める）。
@@ -145,8 +167,8 @@ python tools/make_depth.py studio/assets/rooms/<id>/bg.jpg studio/assets/rooms/<
 - 中身：Depth Anything V2 **Small**（Apache-2.0）を transformers で CPU 実行（1672×941 で約 10 秒・初回はモデル約 100MB をダウンロード）。
   `predicted_depth`（float）を元サイズへ双三次補間 → 1〜99 パーセンタイルで 0..1 に正規化 → 16bit。
 - 形式 **rg16**：R = 上位 8bit、G = 下位 8bit、B = 0 の RGB PNG。**値は 1 = 手前・0 = 奥**。engine は `(R*256+G)/65535` で読む。
-- 出力：`depth_rg.png`（スタジオが読む）、`depth16.png`（確認用。**コミットしない**＝`rm` してよい）、`depth_preview.png`（`--preview`。確認後は消す）。
-- 合格：スクリプトが `WARNING`（下＝床が上＝奥より遠いと推定）を出さないこと。`depth_preview.png` を見て、**床が下ほど白い・手前の物が白い・奥の壁が黒い** こと。
+- 出力：`depth_rg.png`（スタジオが読む）、`depth16.png`（確認用。**コミットしない**＝`rm` してよい）、`depth_preview.png`（`--preview`。確認後は消す）。どちらも `.gitignore` 済み。
+- 合格：スクリプトが `WARNING`（下＝床が上＝奥より遠いと推定）を出さないこと。`depth_preview.png` を見て、**床が下ほど白い・手前の物が白い・奥の壁が黒い** こと。良い例＝見本の [`docs/images/sample_atelier_depth_preview.png`](docs/images/sample_atelier_depth_preview.png)。
 - **注意（来歴の正直な記録）**：作者が本番で使っていた深度も Depth Anything V2 Small＋1〜99 パーセンタイル正規化＋rg16 だが、当時は transformers の pipeline が返す 8bit の `depth` 画像を 16bit に引き伸ばしていた。このキットは同じモデルの float 出力を使うので、段差が出にくい（結果は少しなめらか）。
 - **360° の部屋は深度を使わない**（球＋床への投影で立体感を出す）。360° に `make_depth.py` をかける必要はない。
 
@@ -191,6 +213,7 @@ python tools/make_depth.py studio/assets/rooms/<id>/bg.jpg studio/assets/rooms/<
 | `pano.height` | 撮影点の高さ（m）。大きいほど床が広く・部屋が大きく見える。1.6〜2.2 |
 | `pano.radius` | 床が壁へ立ち上がる距離（m）。`pano_prep.py` の `suggest` から始めて、壁の根元が床に流れて見えたら小さく、部屋が狭苦しければ大きく |
 | `pano.centerU` | 初期カメラが向く横位置（0..1）。スクリーンを中央に描かせたなら 0.5 |
+| `pano.resolution` | （任意）球（`GroundedSkybox`）の分割数。既定 160。床と壁の境目がカクついて見えるときだけ上げる |
 | `screen` | パノラマ上のスクリーン矩形（px）。同じ球面の切れ端にスライドを貼る |
 | `actor.spots` | 床の **m 座標** `[x, z]`（px ではない）。a は撮影点のほぼ真下 `[0, 0.2]` |
 | `anchors.*` | パノラマ上の px。`lighting.anchorDistance`（m）の距離に置く |
@@ -202,7 +225,7 @@ python tools/make_depth.py studio/assets/rooms/<id>/bg.jpg studio/assets/rooms/<
 
 ## (e) 検証する（全部「数」で）
 
-サーバーは自動で立ち上げ・終了させる（`--serve`）。Chrome はヘッドレスで 1 つだけ。
+サーバーは自動で立ち上げ・終了させる（`--serve`）。Chrome はヘッドレスで 1 つだけ。持ち主が 8811 で配信・作業中なら `--port 8812` など別のポートを付ける（検査が本番のスタジオを操作しないように）。
 
 | コマンド | 合格条件 |
 |---|---|
@@ -211,7 +234,7 @@ python tools/make_depth.py studio/assets/rooms/<id>/bg.jpg studio/assets/rooms/<
 | `python tools/studio_parallax.py --room <id>` | near−far が **30〜70 px**（参考：作者の本番 2 部屋 53・55 px、見本 60 px） |
 | `python tools/studio_check.py pano --serve` | 継ぎ目 `ratio <= 1.5` が床・壁・天井の 3 枚とも。天頂・天底の画像（`output/shots/pano_pole_*`）を開いて渦・くさびが無いこと |
 | `python tools/studio_check.py shots --serve` | `output/shots/<id>_{wide,presenter,screen}.png` を **開いて見る**：資料プリセットでスライド全体が収まる・全景で主役が切れていない |
-| `python tools/studio_check.py smoke` | `RESULT: PASS`（全部屋 0px・動画スライドの currentTime が進む・一時停止が効く） |
+| `python tools/studio_check.py smoke` | `RESULT: PASS`（全部屋 0px・動画スライドの currentTime が進む・一時停止が効く）。撮影は `output/shots/smoke_*.jpg`（`--docs` で `docs/images/` を更新）。H.264 を再生できないブラウザ（Linux の Playwright 同梱 Chromium など）では動画検査は `skipped: no H.264 decoder` になり、失敗にはしない |
 
 ### coverage（マゼンタ検査）が何を数えているか
 
@@ -235,9 +258,13 @@ python tools/make_depth.py studio/assets/rooms/<id>/bg.jpg studio/assets/rooms/<
 | `key` | `"Shift+1"`〜`"Shift+0"` か 1 文字（数字単独は部屋選択なので使わない。既存：B X P K O U T M A Q W R E G H F I） |
 | `ease` | 省略＝ease-in-out（3 次）。`"sine"`＝穏やか（一周もの向き） |
 | `loop` / `dur` / `wave` | ループ / 長さ / 呼吸型の揺れ `{"x": [[振幅, 周期秒, 位相], ...]}` |
+| `waveOffset` | （`wave` と一緒に・任意）軸ごとの一定のずらし `{"dolly": 0.022}`。揺れの中心を開始カメラからずらす。可動域の内側へ寄せる計算にも含まれる |
 | `roomTypes` | `["pano360"]` なら 360° の部屋だけ（2.5D 部屋では押せない） |
 | `rooms` | `{"<id>": false}` でその部屋だけ無効、`{"<id>": {"keys": [...]}}` で部屋ごとに差し替え |
 | `kind: "walk"` + `steps` | キャラの歩行（`["walk","b"]`・`["face","slide"|"lookup",秒]`・`["gest","point"|"lookup",秒]`・`["turn","front"]`・`["hold",秒]`） |
+| `end`（walk） | 歩き終わったときに立っている spot（`"a"`・`"b"`・`"c"`）。サーバーが次の歩行の出発点（`walkSpot`）として覚える。省略すると今の spot のまま |
+| `maxSeconds`（walk） | 歩行の最長時間（秒）。この間は次の歩行を受け付けない（`walk_busy`）。**0 < x ≤ 120**（範囲外はサーバーが `invalid_moves` で拒否）。省略時 20。`steps` の合計より少し長めに |
+| `auditFrom`（walk） | coverage 検査でこの歩行を始める spot の一覧。省略時 `["a"]`。a 以外から歩き出す歩行（例 `goto_a` は `["b", "c"]`）に書く |
 
 ムーブの値は **必ず幾何クランプを通る** ので、2.5D で範囲外の値を書いても絵の外は映らない（その代わり、端で動きが止まって見える）。足したら `coverage` を再実行（ムーブも全フレーム検査対象）。
 
@@ -247,7 +274,7 @@ python tools/make_depth.py studio/assets/rooms/<id>/bg.jpg studio/assets/rooms/<
 
 1. 追加した部屋の id・種類、使ったプロンプト（`docs/prompts/<id>.txt` に保存）と生成に使った道具
 2. 上の (e) の表の各コマンドの結果の数（coverage の max・count/expected、視差 px、継ぎ目 ratio、smoke の RESULT）
-3. `docs/images/` に撮れたスクリーンショットのパス
+3. 撮れたスクリーンショットのパス（`output/shots/`。README 用に差し替えるなら `smoke --docs` で `docs/images/`）
 4. 目で見て気になった点（あれば正直に。数が合格でも見た目が悪いことはある）
 
 ## やってはいけないこと

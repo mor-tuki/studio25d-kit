@@ -32,7 +32,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-## @pixiv/three-vrm（v3 系・ビルド済み単一ファイル）
+## @pixiv/three-vrm（v3.4.4・ビルド済み単一ファイル）
 
 - 同梱ファイル: `studio/lib/three-vrm.module.min.js`
 - https://github.com/pixiv/three-vrm — MIT License
@@ -67,7 +67,7 @@ SOFTWARE.
 |---|---|---|
 | Depth Anything V2 Small（`depth-anything/Depth-Anything-V2-Small-hf`） | `tools/make_depth.py` の深度推定（初回に自動ダウンロード） | Apache-2.0（Base / Large は CC-BY-NC-4.0＝非商用のみ） |
 | Hugging Face transformers / PyTorch | 同上 | Apache-2.0 / BSD-3-Clause |
-| PyMuPDF | `tools/pdf_to_slides.py`（PDF → PNG） | AGPL-3.0（または Artifex の商用ライセンス）。手元の変換ツールとして使うだけで、このリポジトリには同梱していません |
+| PyMuPDF | `tools/pdf_to_slides.py`（PDF → PNG） | AGPL-3.0（または Artifex の商用ライセンス）。手元の変換ツールとして使うだけで、このリポジトリには同梱せず、requirements.txt にも入れていません（使う人だけ `pip install pymupdf`） |
 | Real-ESRGAN `RealESRGAN_x4plus.pth` / spandrel | `tools/pano_upscale.py`（任意の高画質拡大） | BSD-3-Clause / MIT |
 | Playwright | `tools/studio_check.py`（検査・スクリーンショット） | Apache-2.0 |
 | ffmpeg | 動画スライドの書き出し・変換（任意） | LGPL / GPL（ビルドによる） |

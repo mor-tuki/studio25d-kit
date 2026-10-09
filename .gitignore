@@ -8,6 +8,9 @@ studio/assets/uploads/
 *.vrm
 # 公開したくない作業中のデッキはこの名前で置く
 studio/assets/slides/private_*/
+# 深度の確認用ファイル（スタジオが読むのは depth_rg.png だけ）
+studio/assets/rooms/*/depth16.png
+studio/assets/rooms/*/depth_preview.png
 # 任意の拡大モデル
 tools/models/
 .DS_Store

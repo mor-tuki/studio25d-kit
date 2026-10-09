@@ -2,9 +2,11 @@
 numpy
 Pillow
 # 深度（tools/make_depth.py）
+# Linux では素の `pip install torch` が CUDA 版（数 GB）を入れます。GPU が要らなければ先に CPU 版を：
+#   pip install torch --index-url https://download.pytorch.org/whl/cpu
 torch
 transformers>=4.45
 # 検査・スクリーンショット（tools/studio_check.py）。追加で: python -m playwright install chromium
 playwright
-# PDF → スライド（tools/pdf_to_slides.py）
-pymupdf
+# PDF → スライド（tools/pdf_to_slides.py）は任意：PyMuPDF（AGPL-3.0）を使うので、使う人だけ別に入れる
+#   pip install pymupdf

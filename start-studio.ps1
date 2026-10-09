@@ -20,11 +20,22 @@ function Get-StudioState {
 $studioState = Get-StudioState
 if ($null -eq $studioState -or $null -eq $studioState.transitionId) {
     if (-not $Python) {
+        # Each probe is isolated: under Windows PowerShell 5.1 with ErrorActionPreference=Stop, a candidate that
+        # writes to stderr (e.g. the Microsoft Store python.exe stub) raises a terminating error. Skip it and go on.
         foreach ($candidate in @('python', 'python3', 'py')) {
-            $command = Get-Command $candidate -ErrorAction SilentlyContinue
-            if ($command) {
-                & $command.Source -c "import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)" 2>$null
-                if ($LASTEXITCODE -eq 0) { $Python = $command.Source; break }
+            try {
+                $command = Get-Command $candidate -CommandType Application -ErrorAction Stop | Select-Object -First 1
+                $previousPreference = $ErrorActionPreference
+                $ErrorActionPreference = 'Continue'
+                try {
+                    $null = & $command.Source -c "import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)" 2>&1
+                    $probeExit = $LASTEXITCODE
+                } finally {
+                    $ErrorActionPreference = $previousPreference
+                }
+                if ($probeExit -eq 0) { $Python = $command.Source; break }
+            } catch {
+                continue
             }
         }
     }

@@ -1,14 +1,16 @@
 # -*- coding: utf-8 -*-
 """studio_check.py — スタジオの検査ドライバ（Playwright・ヘッドレス Chrome 1 つだけ・終わったら必ず閉じる）。
 
-  python tools/studio_check.py smoke      起動確認：全部屋を描き、スクリーンショットを docs/images/ へ。動画スライドが
-                                          スクリーン上で再生されている（currentTime が進む）ことも確かめる
+  python tools/studio_check.py smoke      起動確認：全部屋を描き、スクリーンショットを output/shots/ へ（--docs で docs/images/）。
+                                          動画スライドがスクリーン上で再生されている（currentTime が進む）ことも確かめる。
+                                          ブラウザが H.264 を再生できない（Playwright 同梱の Chromium など）ときは
+                                          動画検査を "skipped: no H.264 decoder" として飛ばす（失敗にはしない）
   python tools/studio_check.py coverage   絵の外（マゼンタ）検査：全部屋 × プリセット3 × カメラ6軸の上下限 64 通り＋中央、
                                           隣の部屋への移動の全フレーム、moves.json の全ムーブ、待機ゆらぎ。合格＝max 0px
   python tools/studio_check.py shots      各部屋 × 全景/話し手/資料 の静止画 → output/shots/
   python tools/studio_check.py pano       360 部屋：継ぎ目（真後ろを床/壁/天井で 3 枚・色差比 ≤ 1.5）と天頂/天底の画像
 
-共通オプション: --port N（既定 8811）  --serve（このスクリプトがサーバーを起動し、最後に止める。smoke は常に --serve）
+共通オプション: --port N（既定 8811。配信中は 8812 など別のポートで）  --serve（このスクリプトがサーバーを起動し、最後に止める。smoke は常に --serve）
 合格しなければ exit 1。サーバーは 127.0.0.1 のみ。空きメモリが --min-free-gb（既定 3）未満なら Chrome を起動しない。
 """
 import argparse
@@ -112,7 +114,7 @@ def studio_page(base, query="", width=1920, height=1080):
             page = browser.new_context(viewport={"width": width, "height": height}, device_scale_factor=1).new_page()
             page.on("pageerror", lambda e: errors.append({"type": "pageerror", "message": str(e)}))
             page.on("console", lambda m: m.type == "error" and errors.append({"type": "console", "message": m.text}))
-            page.goto(f"{base}/?output=1&{query}", wait_until="domcontentloaded")
+            page.goto(f"{base}/?output=1" + (f"&{query}" if query else ""), wait_until="domcontentloaded")
             page.wait_for_function("window.__studio && window.__studio.ready && window.__studio.engine.ready", timeout=120000)
             yield page, errors
         finally:
@@ -129,10 +131,11 @@ def wait_idle(page):
                            " return s && !s.transitionActive && !e.transition; }", timeout=30000)
 
 
-def run_smoke(page, errors, base):
+def run_smoke(page, errors, base, out_dir=SHOTS):
     rooms = json.loads(urllib.request.urlopen(base + "/rooms.json").read())
     state = page.evaluate("() => window.__studio.getState()")
-    os.makedirs(IMAGES, exist_ok=True)
+    os.makedirs(out_dir, exist_ok=True)
+    rel_out = os.path.relpath(out_dir, KIT).replace(os.sep, "/")
     results, made = [], []
     has_char = page.evaluate("() => !!window.__studio.engine.vrm")
     for r in rooms:
@@ -145,14 +148,20 @@ def run_smoke(page, errors, base):
         page.wait_for_timeout(900)
         magenta = page.evaluate("() => window.__studio.engine.countMagenta(1920, 1080).magentaPixels")
         name = f"smoke_{r['id']}.jpg"
-        page.screenshot(path=os.path.join(IMAGES, name), type="jpeg", quality=85)
+        page.screenshot(path=os.path.join(out_dir, name), type="jpeg", quality=85)
         made.append(name)
         results.append({"room": r["id"], "type": r.get("type", "2.5d"), "magentaWide": magenta})
-        print(f"room {r['id']:20s} type={r.get('type', '2.5d'):8s} magenta(wide)={magenta}px -> docs/images/{name}")
+        print(f"room {r['id']:20s} type={r.get('type', '2.5d'):8s} magenta(wide)={magenta}px -> {rel_out}/{name}")
     # video slide: find the first .mp4/.webm in the current deck, show it on the screen of the first room
     slides = page.evaluate("() => window.__studio.getState().slides")
     video_ok = None
     vid = next((i for i, s in enumerate(slides) if s.lower().endswith((".mp4", ".webm"))), None)
+    h264 = page.evaluate("() => document.createElement('video').canPlayType('video/mp4; codecs=\"avc1.42E01E\"')")
+    if vid is not None and slides[vid].lower().endswith(".mp4") and not h264:
+        # Playwright's bundled Chromium has no H.264 decoder (Google Chrome / Edge / OBS do). Not a studio failure.
+        print(f"video slide #{vid + 1} {slides[vid]}: skipped: no H.264 decoder in this browser"
+              " (install Google Chrome, or check in Chrome / OBS)")
+        vid = None
     if vid is not None:
         cmd(page, {"type": "room", "value": rooms[0]["id"]})
         page.wait_for_timeout(300)
@@ -163,7 +172,7 @@ def run_smoke(page, errors, base):
         t1 = page.evaluate("() => window.__studio.engine.currentSlide.userData.video.currentTime")
         page.wait_for_timeout(1200)
         t2 = page.evaluate("() => window.__studio.engine.currentSlide.userData.video.currentTime")
-        page.screenshot(path=os.path.join(IMAGES, "smoke_video_slide.jpg"), type="jpeg", quality=85)
+        page.screenshot(path=os.path.join(out_dir, "smoke_video_slide.jpg"), type="jpeg", quality=85)
         made.append("smoke_video_slide.jpg")
         video_ok = t2 > t1
         print(f"video slide #{vid + 1} {slides[vid]}: currentTime {t1:.2f}s -> {t2:.2f}s  playing={video_ok}")
@@ -261,6 +270,7 @@ def main():
     ap.add_argument("--serve", action="store_true")
     ap.add_argument("--timeout", type=int, default=900)
     ap.add_argument("--min-free-gb", type=float, default=3.0)
+    ap.add_argument("--docs", action="store_true", help="smoke: write screenshots to docs/images/ (README images) instead of output/shots/")
     a = ap.parse_args()
     serve = a.serve or a.what == "smoke"
     port = free_port() if a.what == "smoke" else a.port
@@ -272,9 +282,9 @@ def main():
     t0 = time.time()
     with studio_server(port, serve) as base:
         print("studio:", base)
-        with studio_page(base, "audit=1") as (page, errors):
+        with studio_page(base) as (page, errors):
             page.set_default_timeout(a.timeout * 1000)
-            ok = {"smoke": lambda: run_smoke(page, errors, base), "coverage": lambda: run_coverage(page, errors),
+            ok = {"smoke": lambda: run_smoke(page, errors, base, IMAGES if a.docs else SHOTS), "coverage": lambda: run_coverage(page, errors),
                   "shots": lambda: run_shots(page, base), "pano": lambda: run_pano(page, base)}[a.what]()
     print(f"elapsed {time.time() - t0:.1f}s")
     return 0 if ok else 1

@@ -1,0 +1,3 @@
+# 改行を LF に固定（Windows で clone しても start-studio.sh が /bin/sh でそのまま動くように）
+*.sh text eol=lf
+*.py text eol=lf

@@ -357,7 +357,14 @@ class StudioHTTPAdditionTests(unittest.TestCase):
         self.assertEqual((self.root / "_capture" / "shots" / "evil" / "0001.png").read_bytes(), b"PNGDATA")
         status, _, data = self.request("POST", "/api/audit", json.dumps({"kind": "coverage", "summary": {}}), {"Content-Type": "application/json"})
         self.assertEqual(status, 200)
-        self.assertTrue(Path(json.loads(data)["path"]).is_file())
+        report = json.loads(data)["path"]
+        self.assertFalse(Path(report).is_absolute())
+        self.assertTrue((self.root / report).is_file())
+        for bad in ("..", ".", "a/.."):
+            status, _, _ = self.request("POST", f"/save_frame?dir={bad}&seq={bad}", b"X", {"Content-Length": "1"})
+            self.assertEqual(status, 200)
+        self.assertEqual((self.root / "_capture" / "shots" / "frames" / "0000.png").read_bytes(), b"X")
+        self.assertFalse((self.root / "_capture" / "...png").exists())
         status, _, data = self.request("GET", "/api/decks")
         self.assertEqual(json.loads(data)["decks"], ["assets/slides/deck_a", "assets/slides/deck_v"])
 
